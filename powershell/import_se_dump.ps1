@@ -255,5 +255,24 @@ while($actualRowsInserted -lt $totalRowsToBeInserted)
         Write-Host 'data pushed to server'
         
     }
+
+        # the data table to hold the data to be inserted into post history table
+    $postHistoryTable = New-Object System.Data.DataTable
+
+    # define the columns in the posta history datatable
+    $postHistoryTable.Columns.Add("Id",[int])
+    $postHistoryTable.Columns.Add("Comment")
+    $postHistoryTable.Columns.Add("CreationDate",[DateTime])
+    $postHistoryTable.Columns.Add("PostHistoryTypeId",[int])
+    $postHistoryTable.Columns.Add("PostId",[int])
+    $postHistoryTable.Columns.Add("RevisionGUID",[Guid])
+    $postHistoryTable.Columns.Add("Text")
+    $postHistoryTable.Columns.Add("UserDisplayName")
+    $postHistoryTable.Columns.Add("UserId",[int])
+
+    # get the file path to the "PostHistory.xml" file
+    $postHistoryFile = $DataDumpLoc+"/PostHistory.xml"
+
+  #  if(-not ())
 }
 
