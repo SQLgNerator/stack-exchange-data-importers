@@ -30,6 +30,72 @@ function pushDataToServer
     }
 }
 
+<#
+    Function for initialising the data column values with null values,later these
+    values will be replaced by actual values in the xml
+#>
+function Initialise-DataTable($dataTable)
+{
+    # iterates through each colum and set the default value to null
+    foreach($dataCol in $dataTable.Columns)
+    {
+        $dataCol.DefaultValue = [DBNull]::Value
+    }
+}
+
+<#
+    Function for filling the data row with the values in the xml
+#>
+function Fill-DataRows([System.Data.DataRow]$row,[System.Xml.XmlElement]$xmldata)
+{
+    # get the attributes from the xml node
+    $rowAttributes = $xmldata.attributes
+
+    # iterates through each nodes and get the values corresponds that attribute
+    foreach($attr in $rowAttributes)
+    {
+       $row[$attr.Name] = $attr.Value
+    }
+
+    # this value will be returned from the function
+   # $rowcl
+}
+
+function Load-Xml-MSSQLServer($dataRows,$dataTable,$tableName)
+{
+    Write-Host "Rows to be inserted :- " + $dataRows.count
+
+    $connectionString = "Data Source="+$ServerName+"; Database="+$DatabaseName+";Trusted_Connection=True;Connect Timeout=3000"
+
+    $actualRowsInserted = 0 #specifies the actual number of rows inserted into the database 
+    $totalRowsToBeInserted = $dataRows.count # specifies the total number of rows to be inserted into the database 
+
+    # loop untill all the required rows are insterted into the database
+    while($actualRowsInserted -lt $totalRowsToBeInserted)
+    {
+        Write-Host 'Processing row '$actualRowsInserted
+
+        # create a new row for the data table
+        $newRow = $dataTable.NewRow();
+        Fill-DataRows $newRow $dataRows[$actualRowsInserted]
+
+        # add the new row to the datatable 
+        $dataTable.Rows.Add($newRow)
+
+        # increase the counter for actual rows inserted by 1
+        $actualRowsInserted +=1
+
+        # check whether the total rows instered has reached the maximum threshold value
+        if(($actualRowsInserted -eq $totalRowsToBeInserted-1) -or ($actualRowsInserted % $BatchSize -eq 0))
+        {
+            pushDataToServer $tableName $connectionString $dataTable
+        
+            $dataTable.Rows.Clear()
+        
+            Write-Host 'data pushed to server'
+       }
+    }
+}
 
 # verify the name of the database to which the data is to be exported 
 if(-not $DatabaseName){
@@ -66,7 +132,7 @@ $postTable.Columns.Add("OwnerDisplayName")
 $postTable.Columns.Add("LastEditorUserId",[int])
 $postTable.Columns.Add("LastEditorDisplayName")
 $postTable.Columns.Add("LastEditDate",[DateTime])
-$postTable.Columns.Add("LastAcitvityDate",[DateTime])
+$postTable.Columns.Add("LastActivityDate",[DateTime])
 $postTable.Columns.Add("Title")
 $postTable.Columns.Add("Tags")
 $postTable.Columns.Add("AnswerCount",[int])
@@ -75,11 +141,13 @@ $postTable.Columns.Add("FavoriteCount",[int])
 $postTable.Columns.Add("ClosedDate",[DateTime])
 $postTable.Columns.Add("CommunityOwnedDate",[DateTime])
 
+Initialise-DataTable($postTable);
+
 $postFile = $DataDumpLoc+'/Posts.xml'
 
 # check for the post.xml file in the dump location
 if(-not (Test-Path $postFile)){
-    Write-Host 'Could not find a '+ $postFile+' in the specified dump location.'
+    Write-Host "Could not find a "+ $postFile+" in the specified dump location."
     Exit
 }
 
@@ -91,20 +159,11 @@ $dataRows = $postXmlData.posts.row
 $dataRows.count
 $dataRows.length
 
-$actualRowsInserted = 0 #specifies the actual number of rows inserted into the database 
-$totalRowsToBeInserted = $dataRows.count # specifies the total number of rows to be inserted into the database 
 
-$connectionString = "Data Source="+$ServerName+"; Database="+$DatabaseName+";Trusted_Connection=True;Connect Timeout=3000"
+Load-Xml-MSSQLServer $dataRows $postTable "Posts"
 
-# loop untill all the required rows are insterted into the database
-while($actualRowsInserted -lt $totalRowsToBeInserted)
-{
-    Write-Host 'Processing row '$dataRows[$actualRowsInserted].Id
 
-    # create a new row for the data table
-    $newPost = $postTable.NewRow();
-
-    # fillin the mandatory fields corresponds to each questions/answers
+  <#  # fillin the mandatory fields corresponds to each questions/answers
     $newPost["Id"] = $dataRows[$actualRowsInserted].Id;
     $newPost["PostTypeId"] = $dataRows[$actualRowsInserted].PostTypeId
     $newPost["CreationDate"] = $dataRows[$actualRowsInserted].CreationDate
@@ -240,9 +299,9 @@ while($actualRowsInserted -lt $totalRowsToBeInserted)
     }
 
     # add the new row to the datatable 
-    $postTable.Rows.Add($newPost)
+    $postTable.Rows.Add($newPost)  #>
 
-    # increase the counter for actual rows inserted by 1
+<#    # increase the counter for actual rows inserted by 1
     $actualRowsInserted +=1
 
     # check whether the total rows instered has reached the maximum threshold value
@@ -271,8 +330,8 @@ while($actualRowsInserted -lt $totalRowsToBeInserted)
     $postHistoryTable.Columns.Add("UserId",[int])
 
     # get the file path to the "PostHistory.xml" file
-    $postHistoryFile = $DataDumpLoc+"/PostHistory.xml"
+    $postHistoryFile = $DataDumpLoc+"/PostHistory.xml" #>
 
   #  if(-not ())
-}
+#}
 
