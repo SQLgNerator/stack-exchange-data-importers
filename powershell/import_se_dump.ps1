@@ -5,6 +5,9 @@
     [string]$DataDumpLoc
 )
 
+<#
+    The function for pushing the data in the datatable to the server
+#>
 function pushDataToServer
 {
   param(
@@ -14,8 +17,10 @@ function pushDataToServer
   )
 
   try{
+        # create a object for establishing connection with the database
         $connection = New-Object System.Data.SqlClient.SQLConnection $ConnectionString
         
+        # push the data in the datatable to the server 
         $connection.Open()
         $sqlBulkCopy = New-Object ("Data.SqlClient.SqlBulkCopy") $ConnectionString
         $sqlBulkCopy.DestinationTableName = $TableName
@@ -61,6 +66,10 @@ function Fill-DataRows([System.Data.DataRow]$row,[System.Xml.XmlElement]$xmldata
    # $rowcl
 }
 
+<#
+    The function will load the data from the xml to the specified datatable and then pushed to
+    the specified table name in the database
+#>
 function Load-Xml-MSSQLServer($dataRows,$dataTable,$tableName)
 {
     Write-Host "Rows to be inserted :- " + $dataRows.count
@@ -86,10 +95,11 @@ function Load-Xml-MSSQLServer($dataRows,$dataTable,$tableName)
         $actualRowsInserted +=1
 
         # check whether the total rows instered has reached the maximum threshold value
-        if(($actualRowsInserted -eq $totalRowsToBeInserted-1) -or ($actualRowsInserted % $BatchSize -eq 0))
+        if(($actualRowsInserted -ge $totalRowsToBeInserted-1) -or ($actualRowsInserted % $BatchSize -eq 0))
         {
             pushDataToServer $tableName $connectionString $dataTable
         
+            # clear all rows in the data table
             $dataTable.Rows.Clear()
         
             Write-Host 'data pushed to server'
@@ -141,7 +151,101 @@ $postTable.Columns.Add("FavoriteCount",[int])
 $postTable.Columns.Add("ClosedDate",[DateTime])
 $postTable.Columns.Add("CommunityOwnedDate",[DateTime])
 
-Initialise-DataTable($postTable);
+# the data table to hold the data to be inserted into post history table
+$postHistoryTable = New-Object System.Data.DataTable
+
+# define the columns in the post history datatable
+$postHistoryTable.Columns.Add("Id",[int])
+$postHistoryTable.Columns.Add("Comment")
+$postHistoryTable.Columns.Add("CreationDate",[DateTime])
+$postHistoryTable.Columns.Add("PostHistoryTypeId",[int])
+$postHistoryTable.Columns.Add("PostId",[int])
+$postHistoryTable.Columns.Add("RevisionGUID",[Guid])
+$postHistoryTable.Columns.Add("Text")
+$postHistoryTable.Columns.Add("UserDisplayName")
+$postHistoryTable.Columns.Add("UserId",[int])
+
+# the data table to hold the data to be inserted into post history table
+$commentsTable = New-Object System.Data.DataTable
+
+#define the columns for Comments table
+$commentsTable.Columns.Add("Id",[int])
+$commentsTable.Columns.Add("CreationDate",[DateTime])
+$commentsTable.Columns.Add("PostId",[int])
+$commentsTable.Columns.Add("Score",[int])
+$commentsTable.Columns.Add("Text")
+$commentsTable.Columns.Add("UserDisplayName")
+$commentsTable.Columns.Add("UserId",[int])
+
+# the data table to hold the data to be inserted into badges table
+$badgesTable = New-Object System.Data.DataTable
+
+# define the columns for Badges table
+$badgesTable.Columns.Add("Id",[int])
+$badgesTable.Columns.Add("Date",[DateTime])
+$badgesTable.Columns.Add("Name")
+$badgesTable.Columns.Add("UserId",[int])
+
+# the data table to hold the data to be inserted into post links table
+$postLinksTable = New-Object System.Data.DataTable
+
+# define the columns for PostLinks table
+$postLinksTable.Columns.Add("Id",[int])
+$postLinksTable.Columns.Add("CreationDate",[DateTime])
+$postLinksTable.Columns.Add("LinkTypeId",[int])
+$postLinksTable.Columns.Add("PostId",[int])
+$postLinksTable.Columns.Add("RelatedPostId",[int])
+
+# the data table to hold the data to be inserted into post links table
+$tagsTable = New-Object System.Data.DataTable
+
+# define the columns for Tags table
+$tagsTable.Columns.Add("Id",[int])
+$tagsTable.Columns.Add("Count",[int])
+$tagsTable.Columns.Add("ExcerptPostId",[int])
+$tagsTable.Columns.Add("TagName")
+$tagsTable.Columns.Add("WikiPostId",[int])
+
+# the tata table to hold the data to be inserted in to users table
+$usersTable = New-Object System.Data.DataTable
+
+#define the columns for user table
+$usersTable.Columns.Add("Id",[int])
+$usersTable.Columns.Add("AboutMe")
+$usersTable.Columns.Add("AccountId",[int])
+$usersTable.Columns.Add("Age",[int])
+$usersTable.Columns.Add("CreationDate",[DateTime])
+$usersTable.Columns.Add("DisplayName")
+$usersTable.Columns.Add("DownVotes",[int])
+$usersTable.Columns.Add("EmailHash")
+$usersTable.Columns.Add("LastAccessDate",[DateTime])
+$usersTable.Columns.Add("Location")
+$usersTable.Columns.Add("ProfileImageUrl")
+$usersTable.Columns.Add("Reputation",[int])
+$usersTable.Columns.Add("UpVotes",[int])
+$usersTable.Columns.Add("Views",[int])
+$usersTable.Columns.Add("WebsiteUrl")
+
+# the data table to hold the data for votes table 
+$votesTable = New-Object System.Data.DataTable
+
+#define the columns for votes table
+$votesTable.Columns.Add("Id",[int])
+$votesTable.Columns.Add("BountyAmount",[int])
+$votesTable.Columns.Add("CreationDate",[DateTime])
+$votesTable.Columns.Add("PostId",[int])
+$votesTable.Columns.Add("UserId",[int])
+$votesTable.Columns.Add("VoteTypeId",[int])
+
+# initialise all the data tables with the default value null
+Initialise-DataTable($postTable)
+Initialise-DataTable($postHistoryTable)
+Initialise-DataTable($commentsTable)
+Initialise-DataTable($badgesTable)
+Initialise-DataTable($postLinksTable)
+Initialise-DataTable($tagsTable)
+Initialise-DataTable($usersTable)
+Initialise-DataTable($votesTable)
 
 $postFile = $DataDumpLoc+'/Posts.xml'
 
@@ -155,183 +259,146 @@ if(-not (Test-Path $postFile)){
 [xml]$postXmlData = Get-Content $postFile
 $dataRows = $postXmlData.posts.row
 
-#$postXmlData.posts.row
-$dataRows.count
-$dataRows.length
-
-
 Load-Xml-MSSQLServer $dataRows $postTable "Posts"
 
+# delete the variables used for loading post data form the scope so that they are Garbage collected, and hence getting some free memory
+Remove-Variable postXmlData
+Remove-Variable dataRows
 
-  <#  # fillin the mandatory fields corresponds to each questions/answers
-    $newPost["Id"] = $dataRows[$actualRowsInserted].Id;
-    $newPost["PostTypeId"] = $dataRows[$actualRowsInserted].PostTypeId
-    $newPost["CreationDate"] = $dataRows[$actualRowsInserted].CreationDate
-    $newPost["Score"] = $dataRows[$actualRowsInserted].Score
-    $newPost["Body"] = $dataRows[$actualRowsInserted].Body
-    $newPost["OwnerDisplayName"] = $dataRows[$actualRowsInserted].OwnerDisplayName
-    $newPost["LastEditorDisplayName"] = $dataRows[$actualRowsInserted].LastEditorDisplayName
-    $newPost["Title"] = $dataRows[$actualRowsInserted].Title
-    $newPost["Tags"] = $dataRows[$actualRowsInserted].Tags
-    $newPost["CommentCount"] = $dataRows[$actualRowsInserted].CommentCount
+# get the file path to the "PostHistory.xml" file
+$postHistoryFile = $DataDumpLoc+"/PostHistory.xml"
 
-    # validate the ownerId field in the xml
-    if($dataRows[$actualRowsInserted].OwnerUserId)
-    {
-        # the xml contains a valid owner user Id, add it to the datarow
-        $newPost["OwnerUserId"] = $dataRows[$actualRowsInserted].OwnerUserId
-    }
-    else
-    {
-        # the xml does not contains a valid 'OwnerUserId' data, fill the column with null value
-        $newPost["OwnerUserId"] = [DBNull]::Value
-    }
+# check for the post.xml file in the dump location
+if(-not (Test-Path $postHistoryFile)){
+    Write-Host "Could not find a "+ $postHistoryFile+" in the specified dump location."
+    Exit
+}
 
-    # validate the 'FavoriteCount' fields in the xml
-    if($dataRows[$actualRowsInserted].FavoriteCount)
-    {
-        $newPost["FavoriteCount"] = $dataRows[$actualRowsInserted].FavoriteCount
-    }
-    else
-    {
-        # the xml does not contains a valid 'FavoriteCount' data, fill the column with null value
-        $newPost["FavoriteCount"] = [DBNull]::Value
-    }
+# load the xml for 'PostHistory' details
+[xml]$postHistoryXmlData = Get-Content $postHistoryFile
+$postHistoryRows = $postHistoryXmlData.posthistory.row
 
-    if($dataRows[$actualRowsInserted].AnswerCount)
-    {
-        $newPost["AnswerCount"] = $dataRows[$actualRowsInserted].AnswerCount
-    }
-    else
-    {
-        # the xml does not contains a valid 'AnswerCount' data, fill the column with null value
-        $newPost["AnswerCount"] = [DBNull]::Value
-    }
+Load-Xml-MSSQLServer $postHistoryRows $postHistoryTable "PostHistory"
 
-    if($dataRows[$actualRowsInserted].LastEditDate)
-    {
-        $newPost["LastEditDate"] = $dataRows[$actualRowsInserted].LastEditDate
-    }
-    else
-    {
-        # the xml does not contains a valid 'LastEditDate' data, fill the column with null value
-        $newPost["LastEditDate"] = [DBNull]::Value
-    }
+# delete the variables used for loading post history data form the scope so that they are Garbage collected, and hence getting some free memory
+Remove-Variable postHistoryXmlData
+Remove-Variable postHistoryRows
 
-    if($dataRows[$actualRowsInserted].LastEditorUserId)
-    {
-        $newPost["LastEditorUserId"] = $dataRows[$actualRowsInserted].LastEditorUserId
-    }
-    else
-    {
-        # the xml does not contains a valid 'LastEditorUserId' data, fill the column with null value
-        $newPost["LastEditorUserId"] = [DBNull]::Value
-    }
+# get the file path to the "Comments.xml" file
+$commentsFile = $DataDumpLoc+"/Comments.xml"
 
-    if($dataRows[$actualRowsInserted].OwnerUserId)
-    {
-        $newPost["OwnerUserId"] = $dataRows[$actualRowsInserted].OwnerUserId
-    }
-    else
-    {
-        # the xml does not contains a valid 'OwnerUserId' data, fill the column with null value
-        $newPost["OwnerUserId"] = [DBNull]::Value
-    }
+# check for the post.xml file in the dump location
+if(-not (Test-Path $commentsFile)){
+    Write-Host "Could not find a "+ $commentsFile+" in the specified dump location."
+    Exit
+}
 
-    if($dataRows[$actualRowsInserted].ViewCount)
-    {
-        $newPost["ViewCount"] = $dataRows[$actualRowsInserted].ViewCount
-    }
-    else
-    {
-        # the xml does not contains a valid 'ViewCount' data, fill the column with null value
-        $newPost["ViewCount"] = [DBNull]::Value
-    }
+# load the xml file for comments
+[xml]$commentsXmlData = Get-Content $commentsFile
+$commentsRows = $commentsXmlData.comments.row
 
-    if($dataRows[$actualRowsInserted].AcceptedAnswerId)
-    {
-        $newPost["AcceptedAnswerId"] = $dataRows[$actualRowsInserted].AcceptedAnswerId
-    }
-    else
-    {
-        # the xml does not contains a valid 'AcceptedAnswerId' data, fill the column with null value
-        $newPost["AcceptedAnswerId"] = [DBNull]::Value
-    }
+Load-Xml-MSSQLServer $commentsRows $commentsTable "Comments"
 
-    if($dataRows[$actualRowsInserted].ParentId)
-    {
-        $newPost["ParentId"] = $dataRows[$actualRowsInserted].ParentId
-    }
-    else
-    {
-        # the xml does not contains a valid 'ParentId' data, fill the column with null value
-        $newPost["ParentId"] = [DBNull]::Value
-    }
+# release the variable used for loading the comments xml so that they are garbage collected
+Remove-Variable commentsXmlData
+Remove-Variable commentsRows
 
-    if($dataRows[$actualRowsInserted].LastAcitvityDate)
-    {
-        $newPost["LastAcitvityDate"] = $dataRows[$actualRowsInserted].LastAcitvityDate
-    }
-    else
-    {
-        # the xml does not contains a valid 'LastAcitvityDate' data, fill the column with null value
-        $newPost["LastAcitvityDate"] = [DBNull]::Value
-    }
+# get the file path to the "Comments.xml" file
+$badgesFile = $DataDumpLoc+"/Badges.xml"
 
-    if($dataRows[$actualRowsInserted].CommunityOwnedDate)
-    {
-        $newPost["CommunityOwnedDate"] = $dataRows[$actualRowsInserted].CommunityOwnedDate
-    }
-    else
-    {
-        # the xml does not contains a valid 'CommunityOwnedDate' data, fill the column with null value
-        $newPost["CommunityOwnedDate"] = [DBNull]::Value
-    }
+# check for the post.xml file in the dump location
+if(-not (Test-Path $badgesFile)){
+    Write-Host "Could not find a "+ $badgesFile+" in the specified dump location."
+    Exit
+}
 
-    if($dataRows[$actualRowsInserted].ClosedDate)
-    {
-        $newPost["ClosedDate"] = $dataRows[$actualRowsInserted].ClosedDate
-    }
-    else
-    {
-        # the xml does not contains a valid 'ClosedDate' data, fill the column with null value
-        $newPost["ClosedDate"] = [DBNull]::Value
-    }
+# load the badges xml details from the location
+[xml]$badgesXmlData = Get-Content $badgesFile
+$badgesRows = $badgesXmlData.badges.row
 
-    # add the new row to the datatable 
-    $postTable.Rows.Add($newPost)  #>
+Load-Xml-MSSQLServer $badgesRows $badgesTable "Badges"
 
-<#    # increase the counter for actual rows inserted by 1
-    $actualRowsInserted +=1
+# release the variable used for loading the badges xml so that they are garbage collected
+Remove-Variable badgesXmlData
+Remove-Variable badgesRows
 
-    # check whether the total rows instered has reached the maximum threshold value
-    if(($actualRowsInserted -eq $totalRowsToBeInserted-1) -or ($actualRowsInserted % $BatchSize -eq 0))
-    {
-        pushDataToServer "Posts" $connectionString $postTable
-        
-        $postTable.Rows.Clear()
-        
-        Write-Host 'data pushed to server'
-        
-    }
+# get the file path for "PostLinks.xml" file
+$postLinksFile = $DataDumpLoc+"/PostLinks.xml"
 
-        # the data table to hold the data to be inserted into post history table
-    $postHistoryTable = New-Object System.Data.DataTable
+# check for the PostLinks.xml file in the dump location
+if(-not (Test-Path $postLinksFile)){
+    Write-Host "Could not find a "+ $postLinksFile+" in the specified dump location."
+    Exit
+}
 
-    # define the columns in the posta history datatable
-    $postHistoryTable.Columns.Add("Id",[int])
-    $postHistoryTable.Columns.Add("Comment")
-    $postHistoryTable.Columns.Add("CreationDate",[DateTime])
-    $postHistoryTable.Columns.Add("PostHistoryTypeId",[int])
-    $postHistoryTable.Columns.Add("PostId",[int])
-    $postHistoryTable.Columns.Add("RevisionGUID",[Guid])
-    $postHistoryTable.Columns.Add("Text")
-    $postHistoryTable.Columns.Add("UserDisplayName")
-    $postHistoryTable.Columns.Add("UserId",[int])
+# load the post links details from the xml file
+[xml]$postLinksXmlData = Get-Content $postLinksFile
+$postLinksRows = $postLinksXmlData.postlinks.row
 
-    # get the file path to the "PostHistory.xml" file
-    $postHistoryFile = $DataDumpLoc+"/PostHistory.xml" #>
+Load-Xml-MSSQLServer $postLinksRows $postLinksTable "PostLinks"
 
-  #  if(-not ())
-#}
+# release the variable used for loading the post links xml so that they are garbage collected
+Remove-Variable postLinksXmlData
+Remove-Variable postLinksRows
+
+# get the file path for "Tags.xml" file
+$tagsFile = $DataDumpLoc+"/Tags.xml"
+
+# check for the Tags.xml file in the dump location
+if(-not (Test-Path $tagsFile)){
+    Write-Host "Could not find a "+ $tagsFile+" in the specified dump location."
+    Exit
+}
+
+# laod the tag details from the xml file
+[xml]$tagsXmlData = Get-Content $tagsFile
+$tagsRows = $tagsXmlData.tags.row
+
+Load-Xml-MSSQLServer $tagsRows $tagsTable "Tags"
+
+# release the variable used for loading the tags xml so that they are garbage collected
+Remove-Variable tagsXmlData
+Remove-Variable tagsRows
+
+# get the file path for "Users.xml" file
+$usersFile = $DataDumpLoc+"/Users.xml"
+
+# check for the Users.xml file in the dump location
+if(-not (Test-Path $usersFile)){
+    Write-Host "Could not find a "+ $usersFile+" in the specified dump location."
+    Exit
+}
+
+# load the user details from the xml 
+[xml]$userXmlData = Get-Content $usersFile
+$usersRows = $userXmlData.users.row
+
+Load-Xml-MSSQLServer $usersRows $usersTable "Users"
+
+# release the variable used for loading the user xml so that they are garbage collected
+Remove-Variable userXmlData
+Remove-Variable usersRows
+
+# get the file path for "Users.xml" file
+$votesFile = $DataDumpLoc+"/Votes.xml"
+
+# check for the Votes.xml file in the dump location
+if(-not (Test-Path $votesFile)){
+    Write-Host "Could not find a "+ $votesFile+" in the specified dump location."
+    Exit
+}
+
+# load the votes details from the xml
+[xml]$votesXmlData = Get-Content $votesFile
+$votesRows = $votesXmlData.votes.row
+
+Load-Xml-MSSQLServer $votesRows $votesTable "Votes"
+
+# release the variable used for loading the user xml so that they are garbage collected
+Remove-Variable votesXmlData
+Remove-Variable votesRows
+
+Write-Host "Data has been pushed to the database successfully."
+
+
 
